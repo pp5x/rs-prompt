@@ -580,7 +580,7 @@ def test_bare_cd_from_project_subdir_goes_to_project_root(
     assert output == str(scenario_root / "project1")
 
 
-def test_bare_cd_from_nested_vcs_goes_to_outermost_root(
+def test_bare_cd_from_nested_vcs_goes_to_innermost_root(
     prompt_impl: Implementation,
     scenario_root: Path,
     fake_home: Path,
@@ -596,7 +596,7 @@ def test_bare_cd_from_nested_vcs_goes_to_outermost_root(
         home=fake_home,
     )
 
-    assert output == str(scenario_root / "outer")
+    assert output == str(scenario_root / "outer" / "inner")
 
 
 def test_bare_cd_outside_vcs_goes_to_home(

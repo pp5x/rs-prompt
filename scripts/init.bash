@@ -30,16 +30,14 @@ __rs_prompt_detect_vcs_dir() {
 
 __rs_prompt_outermost_vcs_root() {
     local dir="$PWD"
-    local root=""
 
     while [[ "$dir" != "/" && -n "$dir" ]]; do
         if __rs_prompt_detect_vcs_dir "$dir"; then
-            root="$dir"
+            printf '%s\n' "$dir"
+            return
         fi
         dir="${dir%/*}"
     done
-
-    [[ -n "$root" ]] && printf '%s\n' "$root"
 }
 
 cd() {
