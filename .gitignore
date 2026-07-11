@@ -1,0 +1,7 @@
+/target/
+/.pytest_cache/
+/tests/.pytest_cache/
+/tests/.venv/
+/tests/__pycache__/
+__pycache__/
+*.py[cod]
