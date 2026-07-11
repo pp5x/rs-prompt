@@ -9,6 +9,10 @@ The prompt shape is:
 (user@)?host (virtualenv)? path [status]? (%|$|#)
 ```
 
+![rs-prompt overview](docs/rs-prompt-overview.png)
+
+The overview uses sanitized demo values.
+
 It supports Zsh and Bash init snippets, VCS-aware path rendering for Git, Jujutsu,
 and repo worktrees, virtualenv display, and shell-safe prompt escaping.
 
