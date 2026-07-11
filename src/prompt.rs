@@ -27,7 +27,7 @@ pub fn render(options: Options<'_>) -> std::io::Result<String> {
 
     out.push_str(ansi::WHITE);
     if should_show_user(options.user) {
-        out.push_str(ansi::LIGHT_GREEN);
+        out.push_str(user_color(options.user));
         out.push_str(options.user);
         out.push_str(ansi::RESET);
         out.push_str(ansi::WHITE);
@@ -102,6 +102,14 @@ fn should_show_user(user: &str) -> bool {
 
 fn is_root(user: &str) -> bool {
     user == "root"
+}
+
+fn user_color(user: &str) -> &'static str {
+    if is_root(user) {
+        ansi::LIGHT_RED
+    } else {
+        ansi::LIGHT_GREEN
+    }
 }
 
 #[cfg(test)]
@@ -181,6 +189,11 @@ mod tests {
             ansi::WHITE
         )));
 
+        assert!(!user.contains(&format!("{}alice", ansi::LIGHT_RED)));
+    }
+
+    #[test]
+    fn colors_root_user_light_red_and_marker_dark_red() {
         let root = render(Options {
             cwd: "/tmp",
             home: "/root",
@@ -194,11 +207,18 @@ mod tests {
         assert!(root.starts_with(&format!(
             "{}{}root{}{}@host",
             ansi::WHITE,
-            ansi::LIGHT_GREEN,
+            ansi::LIGHT_RED,
             ansi::RESET,
             ansi::WHITE
         )));
+        assert!(!root.contains(&format!("{}root", ansi::LIGHT_GREEN)));
         assert!(root.ends_with(&format!("{}{}#{} ", ansi::BOLD, ansi::RED, ansi::RESET)));
+        assert!(!root.ends_with(&format!(
+            "{}{}#{} ",
+            ansi::BOLD,
+            ansi::LIGHT_RED,
+            ansi::RESET
+        )));
     }
 
     #[test]

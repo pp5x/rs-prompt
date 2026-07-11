@@ -20,8 +20,10 @@ UNDERLINE_OFF = "\x1b[24m"
 WHITE = "\x1b[37m"
 YELLOW = "\x1b[33m"
 RED = "\x1b[31m"
+LIGHT_RED = "\x1b[91m"
 BLUE = "\x1b[34m"
 GREEN = "\x1b[32m"
+LIGHT_GREEN = "\x1b[92m"
 
 ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
 BASH_PROMPT_MARKER_RE = re.compile(r"\\\[(.*?)\\\]")
@@ -312,11 +314,21 @@ def test_git_path_starts_at_repo_root(
 def test_root_level_vcs_path_keeps_leading_slash(
     rs_prompt_impl: Implementation,
 ) -> None:
-    with tempfile.TemporaryDirectory(dir="/tmp", prefix="rs-prompt-root-") as tmp:
-        path = Path(tmp)
-        (path / ".git").mkdir()
+    tmp_git = Path("/tmp/.git")
+    created_tmp_git = False
+    if not tmp_git.exists():
+        tmp_git.mkdir()
+        created_tmp_git = True
 
-        prompt = run_prompt(rs_prompt_impl, path, Path("/home/example"))
+    try:
+        with tempfile.TemporaryDirectory(dir="/tmp", prefix="rs-prompt-root-") as tmp:
+            path = Path(tmp)
+            (path / ".git").mkdir()
+
+            prompt = run_prompt(rs_prompt_impl, path, Path("/home/example"))
+    finally:
+        if created_tmp_git:
+            tmp_git.rmdir()
 
     assert f"{GREEN}/" in prompt
     assert strip_ansi(prompt).split(" ", 2)[1].startswith("/")
@@ -610,6 +622,13 @@ def test_rs_prompt_visible_user_and_root_cases(
     assert strip_ansi(visible_user_prompt).startswith("alice@host9 ")
     assert strip_ansi(root_prompt).startswith("root@host9 ")
     assert strip_ansi(root_prompt).endswith("# ")
+    assert visible_user_prompt.startswith(
+        f"{WHITE}{LIGHT_GREEN}alice{RESET}{WHITE}@host"
+    )
+    assert root_prompt.startswith(f"{WHITE}{LIGHT_RED}root{RESET}{WHITE}@host")
+    assert f"{LIGHT_GREEN}root" not in root_prompt
+    assert root_prompt.endswith(f"{BOLD}{RED}#{RESET} ")
+    assert not root_prompt.endswith(f"{BOLD}{LIGHT_RED}#{RESET} ")
 
 
 def test_rs_prompt_shell_specific_end_markers(
