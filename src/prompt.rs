@@ -18,6 +18,7 @@ pub struct Options<'a> {
 pub enum Shell {
     Zsh,
     Bash,
+    Fish,
 }
 
 pub fn render(options: Options<'_>) -> std::io::Result<String> {
@@ -26,7 +27,11 @@ pub fn render(options: Options<'_>) -> std::io::Result<String> {
 
     out.push_str(ansi::WHITE);
     if should_show_user(options.user) {
-        write!(out, "{}@", options.user).expect("writing to String failed");
+        out.push_str(ansi::LIGHT_GREEN);
+        out.push_str(options.user);
+        out.push_str(ansi::RESET);
+        out.push_str(ansi::WHITE);
+        out.push('@');
     }
     host::write_highlighted(&mut out, short_hostname).expect("writing to String failed");
     out.push_str(ansi::RESET);
@@ -79,6 +84,12 @@ fn write_end_marker(out: &mut String, shell: Shell, root: bool) {
         Shell::Bash => {
             out.push_str(ansi::GREEN);
             out.push('$');
+            out.push_str(ansi::RESET);
+        }
+        Shell::Fish => {
+            out.push_str(ansi::BOLD);
+            out.push_str(ansi::BLUE);
+            out.push('>');
             out.push_str(ansi::RESET);
         }
     }
@@ -162,7 +173,13 @@ mod tests {
             shell: Shell::Zsh,
         })
         .unwrap();
-        assert!(user.starts_with(&format!("{}alice@host", ansi::WHITE)));
+        assert!(user.starts_with(&format!(
+            "{}{}alice{}{}@host",
+            ansi::WHITE,
+            ansi::LIGHT_GREEN,
+            ansi::RESET,
+            ansi::WHITE
+        )));
 
         let root = render(Options {
             cwd: "/tmp",
@@ -174,7 +191,13 @@ mod tests {
             shell: Shell::Bash,
         })
         .unwrap();
-        assert!(root.starts_with(&format!("{}root@host", ansi::WHITE)));
+        assert!(root.starts_with(&format!(
+            "{}{}root{}{}@host",
+            ansi::WHITE,
+            ansi::LIGHT_GREEN,
+            ansi::RESET,
+            ansi::WHITE
+        )));
         assert!(root.ends_with(&format!("{}{}#{} ", ansi::BOLD, ansi::RED, ansi::RESET)));
     }
 
@@ -203,5 +226,17 @@ mod tests {
         })
         .unwrap();
         assert!(bash.ends_with(&format!("{}${} ", ansi::GREEN, ansi::RESET)));
+
+        let fish = render(Options {
+            cwd: "/tmp",
+            home: "/home/example",
+            hostname: "host",
+            user: "",
+            virtual_env: None,
+            status: 0,
+            shell: Shell::Fish,
+        })
+        .unwrap();
+        assert!(fish.ends_with(&format!("{}{}>{} ", ansi::BOLD, ansi::BLUE, ansi::RESET)));
     }
 }

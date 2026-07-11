@@ -197,6 +197,32 @@ def run_bash_with_init(
     return result.stdout.rstrip("\n")
 
 
+def run_fish_with_init(
+    implementation: Implementation,
+    body: str,
+    *,
+    home: Path,
+) -> str:
+    env = os.environ.copy()
+    env["HOME"] = str(home)
+    env["USER"] = ""
+    env["LOGNAME"] = ""
+    result = subprocess.run(
+        [
+            "fish",
+            "--no-config",
+            "-c",
+            f"{q(implementation.binary)} init fish | source\n{body}",
+        ],
+        cwd=REPO_ROOT,
+        env=env,
+        check=True,
+        text=True,
+        capture_output=True,
+    )
+    return result.stdout.rstrip("\n")
+
+
 @pytest.fixture(scope="session")
 def rs_prompt_impl() -> Implementation:
     implementation = IMPLEMENTATIONS[0]
@@ -449,6 +475,26 @@ def test_rs_prompt_init_bash_references_current_binary(
     assert "__rs_prompt_outermost_vcs_root" in result.stdout
 
 
+def test_rs_prompt_init_fish_references_current_binary(
+    rs_prompt_impl: Implementation,
+) -> None:
+    result = subprocess.run(
+        [str(rs_prompt_impl.binary), "init", "fish"],
+        cwd=REPO_ROOT,
+        check=True,
+        text=True,
+        capture_output=True,
+    )
+
+    assert (
+        f"'{rs_prompt_impl.binary}' prompt --shell=fish --prompt-escape=fish"
+        in result.stdout
+    )
+    assert "function fish_prompt" in result.stdout
+    assert "set -l rs_prompt_status $status" in result.stdout
+    assert "__rs_prompt_outermost_vcs_root" in result.stdout
+
+
 def test_rs_prompt_bash_prompt_rendering_smoke(
     rs_prompt_impl: Implementation,
     scenario_root: Path,
@@ -508,6 +554,34 @@ def test_rs_prompt_bash_prompt_root_rendering_smoke(
     assert visible_output.endswith("# ")
 
 
+def test_rs_prompt_fish_prompt_rendering_smoke(
+    rs_prompt_impl: Implementation,
+    scenario_root: Path,
+    fake_home: Path,
+) -> None:
+    path = scenario_root / "project" / "src"
+    path.mkdir(parents=True)
+    (scenario_root / "project" / ".git").mkdir()
+
+    output = run_fish_with_init(
+        rs_prompt_impl,
+        "\n".join(
+            [
+                "set -e VIRTUAL_ENV",
+                "set -gx HOST host9.example",
+                "set -gx USER ''",
+                "set -gx LOGNAME ''",
+                f"builtin cd {q(path)}",
+                "false",
+                "fish_prompt",
+            ]
+        ),
+        home=fake_home,
+    )
+
+    assert strip_ansi(output) == "host9 project/src [1] > "
+
+
 def test_rs_prompt_visible_user_and_root_cases(
     rs_prompt_impl: Implementation,
     fake_home: Path,
@@ -556,10 +630,19 @@ def test_rs_prompt_shell_specific_end_markers(
         shell="bash",
         user="",
     )
+    fish_prompt = run_prompt(
+        rs_prompt_impl,
+        Path("/etc/nix"),
+        fake_home,
+        shell="fish",
+        user="",
+    )
 
     assert zsh_prompt.endswith(f"{BOLD}{BLUE}%{RESET} ")
     assert bash_prompt.endswith(f"{GREEN}${RESET} ")
+    assert fish_prompt.endswith(f"{BOLD}{BLUE}>{RESET} ")
     assert strip_ansi(bash_prompt).endswith("$ ")
+    assert strip_ansi(fish_prompt).endswith("> ")
 
 
 def test_bare_cd_from_project_subdir_goes_to_project_root(
@@ -647,3 +730,21 @@ def test_explicit_cd_arguments_keep_builtin_behavior(
         str(scenario_root / "project" / "src"),
         str(other),
     ]
+
+
+def test_fish_bare_cd_from_project_subdir_goes_to_project_root(
+    prompt_impl: Implementation,
+    scenario_root: Path,
+    fake_home: Path,
+) -> None:
+    path = scenario_root / "project1" / "src" / "toto"
+    path.mkdir(parents=True)
+    (scenario_root / "project1" / ".git").mkdir()
+
+    output = run_fish_with_init(
+        prompt_impl,
+        f"builtin cd {q(path)}\ncd\npwd",
+        home=fake_home,
+    )
+
+    assert output == str(scenario_root / "project1")

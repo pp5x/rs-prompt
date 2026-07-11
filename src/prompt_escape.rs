@@ -3,6 +3,7 @@ pub enum PromptEscape {
     None,
     Zsh,
     Bash,
+    Fish,
 }
 
 pub fn apply(prompt: &str, escape: PromptEscape) -> String {
@@ -10,6 +11,7 @@ pub fn apply(prompt: &str, escape: PromptEscape) -> String {
         PromptEscape::None => prompt.to_string(),
         PromptEscape::Zsh => wrap_and_escape_zsh(prompt),
         PromptEscape::Bash => wrap_bash(prompt),
+        PromptEscape::Fish => prompt.to_string(),
     }
 }
 
@@ -104,6 +106,7 @@ mod tests {
         );
 
         assert_eq!(prompt, apply(&prompt, PromptEscape::None));
+        assert_eq!(prompt, apply(&prompt, PromptEscape::Fish));
     }
 
     #[test]

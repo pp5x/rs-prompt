@@ -16,6 +16,10 @@ The overview uses sanitized demo values.
 It supports Zsh and Bash init snippets, VCS-aware path rendering for Git, Jujutsu,
 and repo worktrees, virtualenv display, and shell-safe prompt escaping.
 
+## Disclaimer
+
+Fully written using Codex in Rust from a zsh shell version.
+
 ## Configure
 
 Edit the source, rebuild, and reinstall.

@@ -20,6 +20,7 @@ use prompt_escape::PromptEscape;
 
 const INIT_ZSH: &str = include_str!("../scripts/init.zsh");
 const INIT_BASH: &str = include_str!("../scripts/init.bash");
+const INIT_FISH: &str = include_str!("../scripts/init.fish");
 
 #[derive(Debug, Eq, PartialEq)]
 struct PromptArgs {
@@ -100,6 +101,7 @@ fn run_init(args: &[String]) -> io::Result<()> {
     match shell {
         "zsh" => write_init_script(&mut stdout, exe_path, INIT_ZSH),
         "bash" => write_init_script(&mut stdout, exe_path, INIT_BASH),
+        "fish" => write_init_script(&mut stdout, exe_path, INIT_FISH),
         _ => {
             usage();
             process::exit(64);
@@ -197,6 +199,7 @@ fn parse_shell(value: &str) -> Result<Shell, ParseError> {
     match value {
         "zsh" => Ok(Shell::Zsh),
         "bash" => Ok(Shell::Bash),
+        "fish" => Ok(Shell::Fish),
         _ => Err(ParseError::Usage),
     }
 }
@@ -206,6 +209,7 @@ fn parse_prompt_escape(value: &str) -> Result<PromptEscape, ParseError> {
         "none" => Ok(PromptEscape::None),
         "zsh" => Ok(PromptEscape::Zsh),
         "bash" => Ok(PromptEscape::Bash),
+        "fish" => Ok(PromptEscape::Fish),
         _ => Err(ParseError::Usage),
     }
 }
@@ -241,7 +245,7 @@ fn system_hostname() -> String {
 
 fn usage() {
     eprint!(
-        "usage:\n  rs-prompt prompt [--status=N] [--cwd=PATH] [--host=HOST] [--user=USER] [--shell=zsh|bash] [--prompt-escape=none|zsh|bash]\n  rs-prompt init zsh\n  rs-prompt init bash\n"
+        "usage:\n  rs-prompt prompt [--status=N] [--cwd=PATH] [--host=HOST] [--user=USER] [--shell=zsh|bash|fish] [--prompt-escape=none|zsh|bash|fish]\n  rs-prompt init zsh\n  rs-prompt init bash\n  rs-prompt init fish\n"
     );
 }
 
@@ -309,9 +313,14 @@ mod tests {
     }
 
     #[test]
-    fn rejects_unknown_shell() {
-        let args = vec!["--shell=fish".to_string()];
-        assert_eq!(Err(ParseError::Usage), parse_prompt_args(&args));
+    fn parses_fish_shell() {
+        let args = vec![
+            "--shell=fish".to_string(),
+            "--prompt-escape=fish".to_string(),
+        ];
+        let parsed = parse_prompt_args(&args).unwrap();
+        assert_eq!(Shell::Fish, parsed.shell);
+        assert_eq!(PromptEscape::Fish, parsed.prompt_escape);
     }
 
     #[test]
@@ -325,7 +334,7 @@ mod tests {
 
     #[test]
     fn rejects_unknown_prompt_escape() {
-        let args = vec!["--prompt-escape=fish".to_string()];
+        let args = vec!["--prompt-escape=tcsh".to_string()];
         assert_eq!(Err(ParseError::Usage), parse_prompt_args(&args));
     }
 
