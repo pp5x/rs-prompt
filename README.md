@@ -34,8 +34,9 @@ Edit the source, rebuild, and reinstall.
 - Zsh integration: `scripts/init.zsh`
 - Bash integration: `scripts/init.bash`
 
-For example, to hide your normal login name, add it to `HIDDEN_USERS` in
-`src/prompt.rs`, then rebuild.
+For example, to hide your normal login name or machine name, add it to
+`HIDDEN_USERS` or `HIDDEN_HOSTNAMES` in `src/prompt.rs`, then rebuild. Hiding a
+hostname hides the complete `user@hostname` prefix.
 
 ## Build
 

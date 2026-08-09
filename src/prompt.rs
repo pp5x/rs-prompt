@@ -3,6 +3,7 @@ use std::fmt::Write;
 use crate::{ansi, host, path, venv};
 
 const HIDDEN_USERS: &[&str] = &[];
+const HIDDEN_HOSTNAMES: &[&str] = &[];
 
 pub struct Options<'a> {
     pub cwd: &'a str,
@@ -22,20 +23,31 @@ pub enum Shell {
 }
 
 pub fn render(options: Options<'_>) -> std::io::Result<String> {
+    render_with_hidden(options, HIDDEN_USERS, HIDDEN_HOSTNAMES)
+}
+
+fn render_with_hidden(
+    options: Options<'_>,
+    hidden_users: &[&str],
+    hidden_hostnames: &[&str],
+) -> std::io::Result<String> {
     let mut out = String::new();
-    let short_hostname = host::short_hostname(options.hostname);
+    let show_hostname = should_show_hostname(options.hostname, hidden_hostnames);
 
     out.push_str(ansi::WHITE);
-    if should_show_user(options.user) {
-        out.push_str(user_color(options.user));
-        out.push_str(options.user);
+    if show_hostname {
+        let short_hostname = host::short_hostname(options.hostname);
+        if should_show_user(options.user, hidden_users) {
+            out.push_str(user_color(options.user));
+            out.push_str(options.user);
+            out.push_str(ansi::RESET);
+            out.push_str(ansi::WHITE);
+            out.push('@');
+        }
+        host::write_highlighted(&mut out, short_hostname).expect("writing to String failed");
         out.push_str(ansi::RESET);
-        out.push_str(ansi::WHITE);
-        out.push('@');
+        out.push(' ');
     }
-    host::write_highlighted(&mut out, short_hostname).expect("writing to String failed");
-    out.push_str(ansi::RESET);
-    out.push(' ');
 
     if let Some(virtual_env) = options.virtual_env {
         let name = venv::basename(virtual_env);
@@ -96,8 +108,12 @@ fn write_end_marker(out: &mut String, shell: Shell, root: bool) {
     out.push(' ');
 }
 
-fn should_show_user(user: &str) -> bool {
-    !user.is_empty() && !HIDDEN_USERS.contains(&user)
+fn should_show_user(user: &str, hidden_users: &[&str]) -> bool {
+    !user.is_empty() && !hidden_users.contains(&user)
+}
+
+fn should_show_hostname(hostname: &str, hidden_hostnames: &[&str]) -> bool {
+    !hostname.is_empty() && !hidden_hostnames.contains(&hostname)
 }
 
 fn is_root(user: &str) -> bool {
@@ -167,6 +183,51 @@ mod tests {
             ansi::UNDERLINE_OFF,
             ansi::RESET
         )));
+    }
+
+    #[test]
+    fn hides_hostname_and_user_without_leading_whitespace() {
+        let out = render_with_hidden(
+            Options {
+                cwd: "/tmp",
+                home: "/home/example",
+                hostname: "host9.example",
+                user: "alice",
+                virtual_env: None,
+                status: 0,
+                shell: Shell::Zsh,
+            },
+            &["alice"],
+            &["host9.example"],
+        )
+        .unwrap();
+
+        assert!(out.starts_with(&format!("{}{}", ansi::WHITE, ansi::GREEN)));
+        assert!(!out.starts_with(' '));
+        assert!(!out.contains("alice@"));
+        assert!(!out.contains("host9"));
+    }
+
+    #[test]
+    fn hides_hostname_identity_even_for_visible_user() {
+        let out = render_with_hidden(
+            Options {
+                cwd: "/tmp",
+                home: "/home/example",
+                hostname: "host9.example",
+                user: "alice",
+                virtual_env: None,
+                status: 0,
+                shell: Shell::Zsh,
+            },
+            &[],
+            &["host9.example"],
+        )
+        .unwrap();
+
+        assert!(out.starts_with(&format!("{}{}", ansi::WHITE, ansi::GREEN)));
+        assert!(!out.contains("alice@"));
+        assert!(!out.contains("host9"));
     }
 
     #[test]
