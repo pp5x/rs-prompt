@@ -10,10 +10,13 @@ mod venv;
 mod test_support;
 
 use std::env;
+#[cfg(not(target_os = "macos"))]
 use std::fs;
 use std::io::{self, Write};
 use std::path::PathBuf;
 use std::process;
+#[cfg(target_os = "macos")]
+use std::process::Command;
 
 use prompt::Shell;
 use prompt_escape::PromptEscape;
@@ -235,12 +238,36 @@ fn system_hostname() -> String {
         }
     }
 
+    machine_hostname()
+        .filter(|value| !value.is_empty())
+        .unwrap_or_else(|| "unknown".to_string())
+}
+
+#[cfg(target_os = "macos")]
+fn machine_hostname() -> Option<String> {
+    let mut hostname = [0u8; 256];
+    // SAFETY: `hostname` points to a valid writable buffer and its length is
+    // passed correctly to the platform API.
+    let result = unsafe { libc::gethostname(hostname.as_mut_ptr().cast(), hostname.len()) };
+    if result != 0 {
+        return None;
+    }
+
+    let length = hostname
+        .iter()
+        .position(|&byte| byte == 0)
+        .unwrap_or(hostname.len());
+    std::str::from_utf8(&hostname[..length])
+        .ok()
+        .map(str::to_owned)
+}
+
+#[cfg(not(target_os = "macos"))]
+fn machine_hostname() -> Option<String> {
     fs::read_to_string("/proc/sys/kernel/hostname")
         .or_else(|_| fs::read_to_string("/etc/hostname"))
         .map(|value| value.trim_end_matches(&['\r', '\n'][..]).to_string())
         .ok()
-        .filter(|value| !value.is_empty())
-        .unwrap_or_else(|| "unknown".to_string())
 }
 
 fn usage() {
@@ -343,5 +370,17 @@ mod tests {
         let mut out = Vec::new();
         write_single_quoted(&mut out, "/tmp/it's/rs-prompt").unwrap();
         assert_eq!("'/tmp/it'\\''s/rs-prompt'", String::from_utf8(out).unwrap());
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn retrieves_the_macos_machine_hostname() {
+        let expected = String::from_utf8(Command::new("/bin/hostname").output().unwrap().stdout)
+            .unwrap()
+            .trim()
+            .to_string();
+
+        assert!(!expected.is_empty());
+        assert_eq!(Some(expected), machine_hostname());
     }
 }
