@@ -15,7 +15,7 @@ use std::fs;
 use std::io::{self, Write};
 use std::path::PathBuf;
 use std::process;
-#[cfg(target_os = "macos")]
+#[cfg(all(target_os = "macos", test))]
 use std::process::Command;
 
 use prompt::Shell;

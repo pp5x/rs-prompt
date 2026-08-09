@@ -17,6 +17,10 @@ build:
 release:
     cargo build --release
 
+bench:
+    cargo build --release
+    scripts/benchmark.sh target/release/rs-prompt
+
 build-releases version=`cargo pkgid | sed 's/.*#//'`:
     rm -rf dist
     RUSTFLAGS="-C strip=symbols" cargo build --release --target x86_64-unknown-linux-gnu

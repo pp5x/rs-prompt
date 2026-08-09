@@ -1,5 +1,5 @@
 use std::fmt::{self, Write};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use crate::{ansi, vcs};
 
@@ -7,6 +7,7 @@ use crate::{ansi, vcs};
 struct Component<'a> {
     name: &'a str,
     vcs_type: Option<vcs::VcsType>,
+    prefix_end: usize,
 }
 
 pub fn truncate_component(component: &str) -> &str {
@@ -27,14 +28,21 @@ pub fn is_under_home(path: &str, home: &str) -> bool {
 }
 
 pub fn display_path(cwd: &str, home: &str) -> std::io::Result<String> {
-    let absolute = make_absolute(cwd);
+    let absolute = Path::new(cwd);
     let absolute_str = absolute.to_string_lossy();
     let mut components = split_components(&absolute_str);
 
     let mut outermost_vcs_index = None;
     for index in 0..components.len() {
-        let prefix = join_prefix(&components[..=index]);
-        if let Some(kind) = vcs::detect(Path::new(&prefix))? {
+        let detected = if absolute_str.starts_with('/') {
+            vcs::detect(Path::new(&absolute_str[..components[index].prefix_end]))?
+        } else {
+            // Preserve the historical leading-slash behavior for relative
+            // input. The CLI normally supplies an absolute shell PWD.
+            let prefix = format!("/{}", &absolute_str[..components[index].prefix_end]);
+            vcs::detect(Path::new(&prefix))?
+        };
+        if let Some(kind) = detected {
             components[index].vcs_type = Some(kind);
             if outermost_vcs_index.is_none() {
                 outermost_vcs_index = Some(index);
@@ -75,37 +83,27 @@ pub fn display_path(cwd: &str, home: &str) -> std::io::Result<String> {
     Ok(out)
 }
 
-fn make_absolute(path: &str) -> PathBuf {
-    PathBuf::from(path)
-}
-
 fn split_components(path: &str) -> Vec<Component<'_>> {
-    path.split('/')
-        .filter(|part| !part.is_empty())
-        .map(|name| Component {
-            name,
-            vcs_type: None,
-        })
-        .collect()
+    let mut components = Vec::new();
+    let mut offset = 0;
+
+    for name in path.split('/') {
+        let start = offset;
+        offset += name.len() + 1;
+        if !name.is_empty() {
+            components.push(Component {
+                name,
+                vcs_type: None,
+                prefix_end: start + name.len(),
+            });
+        }
+    }
+
+    components
 }
 
 fn count_components(path: &str) -> usize {
     path.split('/').filter(|part| !part.is_empty()).count()
-}
-
-fn join_prefix(components: &[Component<'_>]) -> String {
-    if components.is_empty() {
-        return "/".to_string();
-    }
-
-    let mut out = String::from("/");
-    for (index, component) in components.iter().enumerate() {
-        if index != 0 {
-            out.push('/');
-        }
-        out.push_str(component.name);
-    }
-    out
 }
 
 fn write_components(
@@ -200,6 +198,7 @@ mod tests {
         let components = vec![Component {
             name: "tmp",
             vcs_type: Some(vcs::VcsType::Git),
+            prefix_end: 4,
         }];
 
         write_components(&mut out, &components, true, true).unwrap();
